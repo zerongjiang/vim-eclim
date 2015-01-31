@@ -1,11 +1,8 @@
 " Author:  Eric Van Dewoestine
 "
-" Description: {{{
-"   see http://eclim.org/vim/maven/run.html
+" License: {{{
 "
-" License:
-"
-" Copyright (C) 2005 - 2010  Eric Van Dewoestine
+" Copyright (C) 2012  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -23,13 +20,8 @@
 " }}}
 
 " Command Declarations {{{
-if !exists(":Maven")
-  command -bang -nargs=* Maven
-    \ :call eclim#util#MakeWithCompiler('eclim_maven', '<bang>', '<args>')
-endif
-if !exists(":Mvn")
-  command -bang -nargs=* Mvn
-    \ :call eclim#util#MakeWithCompiler('eclim_mvn', '<bang>', '<args>')
+if !exists(":AndroidReload")
+  command AndroidReload :call eclim#android#Reload()
 endif
 " }}}
 

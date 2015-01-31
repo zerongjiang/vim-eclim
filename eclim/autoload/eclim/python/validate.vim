@@ -5,7 +5,7 @@
 "
 " License:
 "
-" Copyright (C) 2005 - 2012  Eric Van Dewoestine
+" Copyright (C) 2005 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -23,10 +23,10 @@
 " }}}
 
 " Global Variables {{{
-  " if the user has the pyflakes plugin from vim.org, then disable our
+  " if the user has the syntastic plugin (formerly pyflakes), then disable our
   " validation since the two overlap and may result in errors
   let s:pyflakes_enabled = 1
-  if exists('g:pyflakes_builtins')
+  if exists('g:loaded_syntastic_plugin') || exists('g:pyflakes_builtins')
     let s:pyflakes_enabled = 0
   endif
 " }}}
@@ -41,7 +41,11 @@
 " Validate(on_save) {{{
 " Validates the current file.
 function! eclim#python#validate#Validate(on_save)
-  if eclim#util#WillWrittenBufferClose()
+  let validate = !a:on_save || (
+    \ g:EclimPythonValidate &&
+    \ (!exists('g:EclimFileTypeValidate') || g:EclimFileTypeValidate))
+
+  if !validate || eclim#util#WillWrittenBufferClose()
     return
   endif
 
@@ -81,9 +85,8 @@ function! eclim#python#validate#Validate(on_save)
     endif
   endif
 
+  call filter(results, "v:val !~ 'unable to detect undefined names'")
   if !empty(results) || syntax_error != ''
-    call filter(results, "v:val !~ 'unable to detect undefined names'")
-
     let errors = []
     if syntax_error != ''
       let lnum = substitute(syntax_error, '.*(line \(\d\+\))', '\1', '')
@@ -98,9 +101,7 @@ function! eclim#python#validate#Validate(on_save)
           \ 'text': text,
           \ 'type': 'e'
         \ })
-    endif
-
-    if syntax_error == ''
+    else
       for error in results
         let file = substitute(error, '\(.\{-}\):[0-9]\+:.*', '\1', '')
         let line = substitute(error, '.\{-}:\([0-9]\+\):.*', '\1', '')
@@ -123,7 +124,7 @@ function! eclim#python#validate#Validate(on_save)
 endfunction " }}}
 
 " ValidateSyntax() {{{
-function eclim#python#validate#ValidateSyntax()
+function! eclim#python#validate#ValidateSyntax()
   let syntax_error = ''
 
   if has('python')
@@ -156,7 +157,7 @@ EOF
 endfunction " }}}
 
 " PyLint() {{{
-function eclim#python#validate#PyLint()
+function! eclim#python#validate#PyLint()
   let file = expand('%:p')
 
   if !executable('pylint')
@@ -173,7 +174,11 @@ function eclim#python#validate#PyLint()
     let django_dir = eclim#python#django#util#GetProjectPath()
     if django_dir != ''
       call add(paths, fnamemodify(django_dir, ':h'))
-      let settings = fnamemodify(django_dir, ':t')
+      if len($DJANGO_SETTINGS_MODULE)
+        let settings = $DJANGO_SETTINGS_MODULE
+      else
+        let settings = fnamemodify(django_dir, ':t')
+      endif
       if has('win32') || has('win64')
         let pylint_env =
           \ 'set DJANGO_SETTINGS_MODULE='. settings . '.settings && '

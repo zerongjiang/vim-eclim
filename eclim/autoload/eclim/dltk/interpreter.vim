@@ -5,7 +5,7 @@
 "
 " License:
 "
-" Copyright (C) 2005 - 2009  Eric Van Dewoestine
+" Copyright (C) 2005 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -23,29 +23,26 @@
 " }}}
 
 " Script Variables {{{
-  let s:command_interpreters = '-command dltk_interpreters -n <nature>'
+  let s:command_interpreters = '-command dltk_interpreters -l <nature>'
   let s:command_interpreter_addremove =
-    \ '-command dltk_<action>_interpreter -n <nature> -i "<path>"'
+    \ '-command dltk_<action>_interpreter -l <nature> -p "<path>"'
 " }}}
 
-" GetInterpreters(nature) {{{
-function eclim#dltk#interpreter#GetInterpreters(nature)
+function eclim#dltk#interpreter#GetInterpreters(nature) " {{{
   let command = s:command_interpreters
   let command = substitute(command, '<nature>', a:nature, '')
-  let interpreters = eclim#ExecuteEclim(command)
+  let interpreters = eclim#Execute(command)
   if type(interpreters) != g:LIST_TYPE || len(interpreters) == 0
     return []
   endif
 
-  call map(interpreters, 'v:val.path')
   return interpreters
 endfunction " }}}
 
-" ListInterpreters(nature) {{{
-function eclim#dltk#interpreter#ListInterpreters(nature)
+function eclim#dltk#interpreter#ListInterpreters(nature) " {{{
   let command = s:command_interpreters
   let command = substitute(command, '<nature>', a:nature, '')
-  let interpreters = eclim#ExecuteEclim(command)
+  let interpreters = eclim#Execute(command)
   if type(interpreters) != g:LIST_TYPE
     return
   endif
@@ -78,18 +75,15 @@ function eclim#dltk#interpreter#ListInterpreters(nature)
   call eclim#util#Echo(join(output, "\n"))
 endfunction " }}}
 
-" AddInterpreter(nature, type, path) {{{
-function eclim#dltk#interpreter#AddInterpreter(nature, type, path)
+function eclim#dltk#interpreter#AddInterpreter(nature, type, path) " {{{
   return s:InterpreterAddRemove(a:nature, a:type, a:path, 'add')
 endfunction " }}}
 
-" RemoveInterpreter(nature, path) {{{
-function eclim#dltk#interpreter#RemoveInterpreter(nature, path)
+function eclim#dltk#interpreter#RemoveInterpreter(nature, path) " {{{
   return s:InterpreterAddRemove(a:nature, '', a:path, 'remove')
 endfunction " }}}
 
-" s:InterpreterAddRemove(nature, type, path, action) {{{
-function s:InterpreterAddRemove(nature, type, path, action)
+function s:InterpreterAddRemove(nature, type, path, action) " {{{
   let path = a:path
   let path = substitute(path, '\ ', ' ', 'g')
   let path = substitute(path, '\', '/', 'g')
@@ -100,7 +94,7 @@ function s:InterpreterAddRemove(nature, type, path, action)
   if a:action == 'add'
     let command .= ' -t ' . a:type
   endif
-  let result = eclim#ExecuteEclim(command)
+  let result = eclim#Execute(command)
   if result != '0'
     call eclim#util#Echo(result)
     return 1

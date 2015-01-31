@@ -4,7 +4,7 @@
 "
 " License:
 "
-" Copyright (C) 2005 - 2012  Eric Van Dewoestine
+" Copyright (C) 2005 - 2014  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -41,17 +41,21 @@
   let s:shared_instances_by_names = {}
 " }}}
 
-" ProjectTree(...) {{{
-" Open a tree view of the current or specified projects.
-function! eclim#project#tree#ProjectTree(...)
+function! eclim#project#tree#ProjectTree(...) " {{{
+  " Open a tree view of the current or specified projects.
+
   " no project dirs supplied, use current project
   if len(a:000) == 0
     let name = eclim#project#util#GetCurrentProjectName()
-    if name == ''
-      call eclim#project#util#UnableToDetermineProject()
-      return
-    endif
     let names = [name]
+    if name == ''
+      if exists('t:cwd')
+        let names = [t:cwd]
+      else
+        call eclim#project#util#UnableToDetermineProject()
+        return
+      endif
+    endif
 
   " list of project names supplied
   elseif type(a:000[0]) == g:LIST_TYPE
@@ -75,26 +79,35 @@ function! eclim#project#tree#ProjectTree(...)
     endif
 
     let dir = eclim#project#util#GetProjectRoot(name)
-    if dir != ''
-      call add(dirs, dir)
-      let index += 1
-    else
-      call eclim#util#EchoWarning('Project not found: ' . name)
-      call remove(names_copy, index)
+    if dir == ''
+      let dir = expand(name, ':p')
+      if !isdirectory(dir)
+        if eclim#EclimAvailable(0)
+          call eclim#util#EchoWarning('Project not found: ' . name)
+        endif
+        call remove(names_copy, index)
+        continue
+      endif
+      let names_copy[index] = fnamemodify(substitute(dir, '/$', '', ''), ':t')
     endif
+    call add(dirs, dir)
+    let index += 1
   endfor
   let names = names_copy
 
   if len(dirs) == 0
-    "call eclim#util#Echo('ProjectTree: No directories found for requested projects.')
     return
   endif
 
   " for session reload
   let g:Eclim_project_tree_names = join(names, '|')
 
+  let display = len(names) == 1 ?
+    \ 'Project: ' . names[0] :
+    \ 'Projects: ' . join(names, ', ')
+
   call eclim#project#tree#ProjectTreeClose()
-  call eclim#project#tree#ProjectTreeOpen(names, dirs)
+  call eclim#project#tree#ProjectTreeOpen(display, names, dirs)
 endfunction " }}}
 
 function! eclim#project#tree#ProjectTreeToggle() " {{{
@@ -110,15 +123,11 @@ function! eclim#project#tree#ProjectTreeToggle() " {{{
   endif
 endfunction " }}}
 
-function! eclim#project#tree#ProjectTreeOpen(names, dirs, ...) " {{{
+function! eclim#project#tree#ProjectTreeOpen(display, names, dirs) " {{{
+  let expand = len(a:dirs) == 1
   let expandDir = ''
-  if g:EclimProjectTreeExpandPathOnOpen
+  if expand && g:EclimProjectTreeExpandPathOnOpen
     let expandDir = substitute(expand('%:p:h'), '\', '/', 'g')
-  endif
-
-  " support supplied tree name
-  if a:0 > 0 && a:1 != ''
-    let t:project_tree_name = a:1
   endif
 
   " see if we should just use a shared tree
@@ -129,10 +138,16 @@ function! eclim#project#tree#ProjectTreeOpen(names, dirs, ...) " {{{
     if line('$') > 1 || getline(1) !~ '^\s*$'
       setlocal nowrap nonumber
       setlocal foldmethod=manual foldtext=getline(v:foldstart)
+      exec 'setlocal statusline=' . escape(a:display, ' ')
       if !exists('t:project_tree_name')
         exec 'let t:project_tree_id = ' .
           \ substitute(bufname(shared), g:EclimProjectTreeTitle . '\(\d\+\)', '\1', '')
       endif
+
+      if expand && expandDir != ''
+        call eclim#tree#ExpandPath(s:GetTreeTitle(), expandDir)
+      endif
+
       return
     endif
   endif
@@ -153,8 +168,6 @@ function! eclim#project#tree#ProjectTreeOpen(names, dirs, ...) " {{{
     endif
   endif
 
-  let expand = len(a:dirs) == 1
-
   if exists('g:TreeSettingsFunction')
     let s:TreeSettingsFunction = g:TreeSettingsFunction
   endif
@@ -171,6 +184,7 @@ function! eclim#project#tree#ProjectTreeOpen(names, dirs, ...) " {{{
   endtry
 
   setlocal bufhidden=hide
+  exec 'setlocal statusline=' . escape(a:display, ' ')
 
   if expand && expandDir != ''
     call eclim#util#DelayedCommand(
@@ -308,6 +322,12 @@ function! s:InfoLine() " {{{
     catch /E\(117\|700\)/
       " fall back to fugitive
       try
+        " fugitive calls a User autocmd, so stop if that one is triggering
+        " this one to prevent a recursive loop
+        if exists('b:eclim_fugative_autocmd')
+          return
+        endif
+
         " make sure fugitive has the git dir for the current project
         if !exists('b:git_dir') || (b:git_dir !~ '^\M' . b:roots[0])
           let cwd = ''
@@ -319,6 +339,10 @@ function! s:InfoLine() " {{{
           if exists('b:git_dir')
             unlet b:git_dir
           endif
+
+          " slight hack to prevent recursive autocmd loop with fugitive
+          let b:eclim_fugative_autocmd = 1
+
           silent! doautocmd fugitive BufReadPost %
 
           if cwd != ''
@@ -335,6 +359,8 @@ function! s:InfoLine() " {{{
         endif
       catch /E\(117\|700\)/
         " noop if the neither function was found
+      finally
+          silent! unlet b:eclim_fugative_autocmd
       endtry
     endtry
 
@@ -370,7 +396,7 @@ function! s:OpenFile(action) " {{{
     endif
 
     call eclim#tree#ExecuteAction(path,
-      \ "call eclim#project#tree#OpenProjectFile('" . a:action . "', '<cwd>', '<file>')")
+      \ "call eclim#project#tree#OpenProjectFile('" . a:action . "', '<file>')")
   endif
 endfunction " }}}
 
@@ -396,8 +422,7 @@ endfunction " }}}
 function! eclim#project#tree#ProjectTreeSettings() " {{{
   for action in g:EclimProjectTreeActions
     call eclim#tree#RegisterFileAction(action.pattern, action.name,
-      \ "call eclim#project#tree#OpenProjectFile('" .
-      \   action.action . "', '<cwd>', '<file>')")
+      \ "call eclim#project#tree#OpenProjectFile('" . action.action . "', '<file>')")
   endfor
 
   call eclim#tree#RegisterDirAction(function('eclim#project#tree#InjectLinkedResources'))
@@ -415,21 +440,17 @@ function! eclim#project#tree#ProjectTreeSettings() " {{{
   augroup END
 endfunction " }}}
 
-" OpenProjectFile(cmd, cwd, file) {{{
-" Execute the supplied command in one of the main content windows.
-function! eclim#project#tree#OpenProjectFile(cmd, cwd, file)
-  let cmd = a:cmd
-  let cwd = substitute(getcwd(), '\', '/', 'g')
-  let cwd = escape(cwd, ' &')
-
-  "exec 'cd ' . escape(a:cwd, ' ')
-  exec g:EclimProjectTreeContentWincmd
-
-  let file = cwd . '/' . a:file
-
-  if eclim#util#GoToBufferWindow(file)
+function! eclim#project#tree#OpenProjectFile(cmd, file) " {{{
+  " Execute the supplied command in one of the main content windows.
+  if eclim#util#GoToBufferWindow(a:file)
     return
   endif
+
+  let file = a:file
+  let cmd = a:cmd
+  let cwd = getcwd()
+
+  exec g:EclimProjectTreeContentWincmd
 
   " if the buffer is a no name and action is split, use edit instead.
   if cmd =~ 'split' && expand('%') == '' &&
@@ -437,10 +458,20 @@ function! eclim#project#tree#OpenProjectFile(cmd, cwd, file)
     let cmd = 'edit'
   endif
 
+  " current file doesn't share same cwd as the project tree
+  let lcwd = getcwd()
+  if lcwd != cwd && !filereadable(file)
+    let file = escape(substitute(cwd, '\', '/', 'g'), ' &') . '/' . file
+  endif
+
   try
     exec cmd . ' ' file
   catch /E325/
-    " ignore attention error since the use should be prompted to handle it.
+    " ignore attention error since the user should be prompted to handle it.
+  finally
+    if lcwd != cwd
+      exec 'lcd ' . escape(cwd, ' ')
+    endif
   endtry
 endfunction " }}}
 
@@ -451,7 +482,8 @@ function! eclim#project#tree#InjectLinkedResources(dir, contents) " {{{
   endif
 
   " listing the project root, so inject our project links
-  if len(project.links) && substitute(a:dir, '/$', '', '') == project.path
+  if len(get(project, 'links', {})) &&
+   \ substitute(a:dir, '/$', '', '') == project.path
     if !exists('b:links')
       let b:links = {}
     endif
@@ -478,10 +510,9 @@ function! eclim#project#tree#InjectLinkedResources(dir, contents) " {{{
   endif
 endfunction " }}}
 
-" HorizontalContentWindow() {{{
-" Command for g:EclimProjectTreeContentWincmd used when relative to a
-" horizontal taglist window.
-function! eclim#project#tree#HorizontalContentWindow()
+function! eclim#project#tree#HorizontalContentWindow() " {{{
+  " Command for g:EclimProjectTreeContentWincmd used when relative to a
+  " horizontal taglist window.
   winc k
   if exists('g:TagList_title') && bufname(bufnr('%')) == g:TagList_title
     winc k

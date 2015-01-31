@@ -1,10 +1,8 @@
 " Author:  Eric Van Dewoestine
 "
-" Description: {{{
+" License: {{{
 "
-" License:
-"
-" Copyright (C) 2005 - 2012  Eric Van Dewoestine
+" Copyright (C) 2011 - 2014  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -21,19 +19,26 @@
 "
 " }}}
 
-" load any xml related functionality
-runtime! ftplugin/xml.vim
-runtime! indent/xml.vim
-
-" Command Declarations {{{
-if !exists(":MavenRepo")
-  command -nargs=0 -buffer
-    \ MavenRepo :call eclim#java#maven#SetClasspathVariable('Maven', 'MAVEN_REPO')
-endif
-if !exists(":MavenDependencySearch")
-  command -nargs=1 -buffer MavenDependencySearch
-    \ :call eclim#java#maven#Search('<args>', 'maven')
-endif
+" Global Varables {{{
+  if !exists("g:EclimScalaCompleteLayout")
+    if &completeopt !~ 'preview' && &completeopt =~ 'menu'
+      let g:EclimScalaCompleteLayout = 'standard'
+    else
+      let g:EclimScalaCompleteLayout = 'compact'
+    endif
+  endif
 " }}}
+
+" Script Varables {{{
+  let s:complete_command =
+    \ '-command scala_complete -p "<project>" -f "<file>" ' .
+    \ '-o <offset> -e <encoding> -l <layout>'
+" }}}
+
+function! eclim#scala#complete#CodeComplete(findstart, base) " {{{
+  return eclim#lang#CodeComplete(
+    \ s:complete_command, a:findstart, a:base,
+    \ {'temp': 0, 'layout': g:EclimScalaCompleteLayout})
+endfunction " }}}
 
 " vim:ft=vim:fdm=marker

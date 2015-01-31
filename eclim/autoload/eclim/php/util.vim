@@ -5,7 +5,7 @@
 "
 " License:
 "
-" Copyright (C) 2005 - 2012  Eric Van Dewoestine
+" Copyright (C) 2005 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -27,42 +27,49 @@
   let s:html_validate_command = '-command html_validate -p "<project>" -f "<file>"'
 " }}}
 
-" IsPhpCode(lnum) {{{
-" Determines if the code under the cursor is php code (in a php block).
-function! eclim#php#util#IsPhpCode(lnum)
+function! eclim#php#util#IsPhpCode(lnum) " {{{
+  " Determines if the code under the cursor is php code (in a php block).
+
   " FIXME: may get confused if either of these occur in a comment.
   "        can fix with searchpos and checking syntax name on result.
   let phpstart = search('<?\(php\|=\)\?', 'bcnW')
-  let phpend = search('?>', 'bnW', line('w0'))
+  if phpstart > 0
+    let phpend = search('?>', 'bnW')
+  endif
   return phpstart > 0 && phpstart <= a:lnum && (phpend == 0 || phpend < phpstart)
 endfunction " }}}
 
-" UpdateSrcFile(validate) {{{
-" Updates the src file on the server w/ the changes made to the current file.
-function! eclim#php#util#UpdateSrcFile(validate)
+function! eclim#php#util#UpdateSrcFile(on_save) " {{{
+  " Updates the src file on the server w/ the changes made to the current file.
+
+  let validate = !a:on_save || (
+    \ g:EclimPhpValidate &&
+    \ (!exists('g:EclimFileTypeValidate') || g:EclimFileTypeValidate))
+
   let project = eclim#project#util#GetCurrentProjectName()
   if project != ""
     let file = eclim#project#util#GetProjectRelativeFilePath()
     let command = s:update_command
     let command = substitute(command, '<project>', project, '')
     let command = substitute(command, '<file>', file, '')
-    if (g:EclimPhpValidate || a:validate) && !eclim#util#WillWrittenBufferClose()
+    if validate && !eclim#util#WillWrittenBufferClose()
       let command = command . ' -v'
       if eclim#project#problems#IsProblemsList()
         let command = command . ' -b'
       endif
     endif
-    let result = eclim#ExecuteEclim(command)
+    let result = eclim#Execute(command)
     if type(result) != g:LIST_TYPE
       return
     endif
 
-    if (g:EclimPhpHtmlValidate || a:validate) && !eclim#util#WillWrittenBufferClose()
-      " html validate
+    let html_validate = exists('b:EclimPhpHtmlValidate') ?
+      \ b:EclimPhpHtmlValidate : g:EclimPhpHtmlValidate
+    if validate && html_validate && !eclim#util#WillWrittenBufferClose()
       let command = s:html_validate_command
       let command = substitute(command, '<project>', project, '')
       let command = substitute(command, '<file>', file, '')
-      let result_html = eclim#ExecuteEclim(command)
+      let result_html = eclim#Execute(command)
       if type(result_html) == g:LIST_TYPE
         let result += result_html
       endif
@@ -76,15 +83,13 @@ function! eclim#php#util#UpdateSrcFile(validate)
       call eclim#util#ClearLocationList()
     endif
 
-    call eclim#project#problems#ProblemsUpdate()
-  elseif a:validate
+    call eclim#project#problems#ProblemsUpdate('save')
+  elseif !a:on_save
     call eclim#project#util#IsCurrentFileInProject()
   endif
 endfunction " }}}
 
-" CommandCompleteProject(argLead, cmdLine, cursorPos) {{{
-" Custom command completion for project names.
-function! eclim#php#util#CommandCompleteProject(argLead, cmdLine, cursorPos)
+function! eclim#php#util#CommandCompleteProject(argLead, cmdLine, cursorPos) " {{{
   return eclim#project#util#CommandCompleteProjectByNature(
     \ a:argLead, a:cmdLine, a:cursorPos, 'php')
 endfunction " }}}

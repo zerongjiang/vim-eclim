@@ -1,11 +1,11 @@
 " Author:  Eric Van Dewoestine
 "
 " Description: {{{
-"  Syntax file for maven's project.xml files.
+"   Vim file type detection script for eclim.
 "
 " License:
 "
-" Copyright (C) 2005 - 2009  Eric Van Dewoestine
+" Copyright (C) 2012  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -22,6 +22,6 @@
 "
 " }}}
 
-runtime! syntax/xml.vim
+autocmd BufRead *.aidl set ft=java
 
 " vim:ft=vim:fdm=marker

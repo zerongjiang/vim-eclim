@@ -5,7 +5,7 @@
 "
 " License:
 "
-" Copyright (C) 2005 - 2012  Eric Van Dewoestine
+" Copyright (C) 2005 - 2014  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -29,14 +29,20 @@ if !exists("g:EclimPhpValidate")
 endif
 
 if !exists("g:EclimPhpHtmlValidate")
-  let g:EclimPhpHtmlValidate = g:EclimPhpValidate
+  let g:EclimPhpHtmlValidate = 0
+endif
+
+if !exists("g:EclimPhpSyntasticEnabled")
+  let g:EclimPhpSyntasticEnabled = 0
 endif
 
 " }}}
 
 " Options {{{
 
-setlocal completefunc=eclim#php#complete#CodeComplete
+exec 'setlocal ' . g:EclimCompletionMethod . '=eclim#php#complete#CodeComplete'
+
+call eclim#lang#DisableSyntasticIfValidationIsEnabled('php')
 
 " }}}
 
@@ -48,14 +54,14 @@ augroup END
 
 augroup eclim_php
   autocmd! BufWritePost <buffer>
-  autocmd BufWritePost <buffer> call eclim#php#util#UpdateSrcFile(0)
+  autocmd BufWritePost <buffer> call eclim#php#util#UpdateSrcFile(1)
 augroup END
 
 " }}}
 
 " Command Declarations {{{
 
-command! -nargs=0 -buffer Validate :call eclim#php#util#UpdateSrcFile(1)
+command! -nargs=0 -buffer Validate :call eclim#php#util#UpdateSrcFile(0)
 
 if !exists(":PhpSearch")
   command -buffer -nargs=*

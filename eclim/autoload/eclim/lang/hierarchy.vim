@@ -1,11 +1,8 @@
 " Author:  Eric Van Dewoestine
 "
-" Description: {{{
-"   see http://eclim.org/vim/c/hierarchy.html
+" License: {{{
 "
-" License:
-"
-" Copyright (C) 2005 - 2012  Eric Van Dewoestine
+" Copyright (C) 2005 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -22,20 +19,13 @@
 "
 " }}}
 
-" Global Variables {{{
-if !exists('g:EclimCHierarchyDefaultAction')
-  let g:EclimCHierarchyDefaultAction = g:EclimDefaultFileOpenAction
-endif
-" }}}
-
-" Script Varables {{{
+" Script Variables {{{
   let s:call_hierarchy =
-    \ '-command c_callhierarchy -p "<project>" -f "<file>" ' .
+    \ '-command <lang>_callhierarchy -p "<project>" -f "<file>" ' .
     \ '-o <offset> -l <length> -e <encoding>'
 " }}}
 
-" CallHierarchy() {{{
-function! eclim#c#hierarchy#CallHierarchy()
+function! eclim#lang#hierarchy#CallHierarchy(lang, default_action, bang) " {{{
   if !eclim#project#util#IsCurrentFileInProject(1)
     return
   endif
@@ -48,13 +38,18 @@ function! eclim#c#hierarchy#CallHierarchy()
   let offset = substitute(position, '\(.*\);\(.*\)', '\1', '')
   let length = substitute(position, '\(.*\);\(.*\)', '\2', '')
   let command = s:call_hierarchy
+  let command = substitute(command, '<lang>', a:lang, '')
   let command = substitute(command, '<project>', project, '')
   let command = substitute(command, '<file>', file, '')
   let command = substitute(command, '<offset>', offset, '')
   let command = substitute(command, '<length>', length, '')
   let command = substitute(command, '<encoding>', eclim#util#GetEncoding(), '')
+  " return callees
+  if a:bang != ''
+    let command .= ' -c'
+  endif
 
-  let result = eclim#ExecuteEclim(command)
+  let result = eclim#Execute(command)
   if type(result) != g:DICT_TYPE
     return
   endif
@@ -66,10 +61,11 @@ function! eclim#c#hierarchy#CallHierarchy()
 
   let lines = []
   let info = []
-  call s:CallHierarchyFormat(result, lines, info, '')
+  let key = a:bang != '' ? 'callees' : 'callers'
+  call s:CallHierarchyFormat(result, key, lines, info, '')
 
   call eclim#util#TempWindow('[Call Hierarchy]', lines)
-  set ft=c
+  exec 'set ft=' . a:lang
   " fold function calls into their parent
   setlocal foldmethod=expr
   setlocal foldexpr='>'.len(substitute(getline(v:lnum),'^\\(\\s*\\).*','\\1',''))/2
@@ -82,8 +78,8 @@ function! eclim#c#hierarchy#CallHierarchy()
 
   let b:hierarchy_info = info
 
-  nnoremap <buffer> <silent> <cr>
-    \ :call <SID>Open(g:EclimCHierarchyDefaultAction)<cr>
+  exec 'nnoremap <buffer> <silent> <cr> ' .
+    \ ':call <SID>Open("' . a:default_action . '")<cr>'
   nnoremap <buffer> <silent> E :call <SID>Open('edit')<cr>
   nnoremap <buffer> <silent> S :call <SID>Open('split')<cr>
   nnoremap <buffer> <silent> T :call <SID>Open("tablast \| tabnew")<cr>
@@ -100,8 +96,7 @@ function! eclim#c#hierarchy#CallHierarchy()
     \ :call eclim#help#BufferHelp(b:hierarchy_help, 'vertical', 40)<cr>
 endfunction " }}}
 
-" s:CallHierarchyFormat(result, lines, info, indent) {{{
-function! s:CallHierarchyFormat(result, lines, info, indent)
+function! s:CallHierarchyFormat(result, key, lines, info, indent) " {{{
   if has_key(a:result, 'position')
     call add(a:info, {
         \ 'file': a:result.position.filename,
@@ -114,13 +109,12 @@ function! s:CallHierarchyFormat(result, lines, info, indent)
     call add(a:lines, a:indent . a:result.name)
   endif
 
-  for caller in get(a:result, 'calledBy', [])
-    call s:CallHierarchyFormat(caller, a:lines, a:info, a:indent . "\t")
+  for call in get(a:result, a:key, [])
+    call s:CallHierarchyFormat(call, a:key, a:lines, a:info, a:indent . "\t")
   endfor
 endfunction " }}}
 
-" s:Open(action) {{{
-function! s:Open(action)
+function! s:Open(action) " {{{
   let line = line('.')
   if line > len(b:hierarchy_info)
     return

@@ -5,7 +5,7 @@
 "
 " License:
 "
-" Copyright (C) 2005 - 2009  Eric Van Dewoestine
+" Copyright (C) 2005 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -22,17 +22,12 @@
 "
 " }}}
 
-" Global Variables {{{
-
-if !exists("g:EclimJavascriptValidate")
-  let g:EclimJavascriptValidate = 1
-endif
-
-" }}}
-
 " Options {{{
 
-setlocal completefunc=eclim#javascript#complete#CodeComplete
+" tern has better auto completion than eclipse
+if &omnifunc != 'tern#Complete'
+  exec 'setlocal ' . g:EclimCompletionMethod . '=eclim#javascript#complete#CodeComplete'
+endif
 
 " }}}
 
@@ -40,8 +35,7 @@ setlocal completefunc=eclim#javascript#complete#CodeComplete
 
 augroup eclim_javascript
   autocmd! BufWritePost <buffer>
-  autocmd BufWritePost <buffer>
-    \ call eclim#javascript#util#UpdateSrcFile(g:EclimJavascriptValidate)
+  autocmd BufWritePost <buffer> call eclim#javascript#util#UpdateSrcFile(0)
 augroup END
 
 " }}}

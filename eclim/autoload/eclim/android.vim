@@ -2,7 +2,7 @@
 "
 " License: {{{
 "
-" Copyright (C) 2005 - 2013  Eric Van Dewoestine
+" Copyright (C) 2012 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -19,26 +19,21 @@
 "
 " }}}
 
-if exists("current_compiler")
-  finish
-endif
-let current_compiler = "eclim_javadoc"
+" Script Variables {{{
+let s:command_reload = '-command android_reload'
+" }}}
 
-let instance = eclim#client#nailgun#ChooseEclimdInstance()
-let command = eclim#client#nailgun#GetEclimCommand(instance.home)
-let command .= ' --nailgun-port ' . instance.port
-let command .= ' -command javadoc $*'
-if has('win32') || has('win64') || has('win32unix')
-  let command = 'cmd /c " ' . command . ' "'
-else
-  let command = substitute(command, '"', '', 'g')
-endif
-exec 'CompilerSet makeprg=' . escape(command, ' "')
+function! eclim#android#Reload() " {{{
+  let result = eclim#Execute(s:command_reload)
+  if type(result) != g:DICT_TYPE
+    return
+  endif
 
-exec 'CompilerSet errorformat=' .
-  \ '\%A%.%#[javadoc]\ %f:%l:\ %m,' .
-  \ '\%-Z%.%#[javadoc]\ %p^,' .
-  \ '\%-G%.%#[javadoc]%.%#,' .
-  \ '\%-G%.%#'
+  if has_key(result, 'error')
+    call eclim#util#EchoError(result.error)
+  else
+    call eclim#util#Echo(result.message)
+  endif
+endfunction " }}}
 
 " vim:ft=vim:fdm=marker

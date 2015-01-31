@@ -1,11 +1,8 @@
 " Author:  Eric Van Dewoestine
 "
-" Description: {{{
-"   see http://eclim.org/vim/java/ant/run.html
+" License: {{{
 "
-" License:
-"
-" Copyright (C) 2005 - 2011  Eric Van Dewoestine
+" Copyright (C) 2011 - 2014  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -22,11 +19,41 @@
 "
 " }}}
 
-" Command Declarations {{{
-if !exists(":Ant")
-  command -bang -nargs=* -complete=customlist,eclim#java#ant#complete#CommandCompleteTarget
-    \ Ant :call eclim#util#MakeWithCompiler('eclim_ant', '<bang>', '<args>')
+" Global Variables {{{
+
+if !exists("g:EclimScalaValidate")
+  let g:EclimScalaValidate = 1
 endif
+
+" }}}
+
+" Options {{{
+
+exec 'setlocal ' . g:EclimCompletionMethod . '=eclim#scala#complete#CodeComplete'
+
+" }}}
+
+" Autocmds {{{
+
+augroup eclim_scala
+  autocmd! BufWritePost <buffer>
+  autocmd BufWritePost <buffer> call eclim#lang#UpdateSrcFile('scala')
+augroup END
+
+" }}}
+
+" Command Declarations {{{
+
+command! -nargs=0 -buffer Validate :call eclim#lang#UpdateSrcFile('scala', 1)
+
+if !exists(":ScalaSearch")
+  command -buffer -nargs=0 ScalaSearch :call eclim#scala#search#Search('<args>')
+endif
+
+if !exists(":ScalaImport")
+  command -buffer -nargs=0 ScalaImport :call eclim#scala#import#Import()
+endif
+
 " }}}
 
 " vim:ft=vim:fdm=marker
