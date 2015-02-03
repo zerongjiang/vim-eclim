@@ -93,8 +93,12 @@ function! eclim#project#tree#ProjectTree(...)
   " for session reload
   let g:Eclim_project_tree_names = join(names, '|')
 
+  let display = len(names) == 1 ?
+    \ 'Project: ' . names[0] :
+    \ 'Projects: ' . join(names, ', ')
+
   call eclim#project#tree#ProjectTreeClose()
-  call eclim#project#tree#ProjectTreeOpen(names, dirs)
+  call eclim#project#tree#ProjectTreeOpen(display, names, dirs)
 endfunction " }}}
 
 function! eclim#project#tree#ProjectTreeToggle() " {{{
@@ -110,15 +114,10 @@ function! eclim#project#tree#ProjectTreeToggle() " {{{
   endif
 endfunction " }}}
 
-function! eclim#project#tree#ProjectTreeOpen(names, dirs, ...) " {{{
+function! eclim#project#tree#ProjectTreeOpen(display, names, dirs) " {{{
   let expandDir = ''
   if g:EclimProjectTreeExpandPathOnOpen
     let expandDir = substitute(expand('%:p:h'), '\', '/', 'g')
-  endif
-
-  " support supplied tree name
-  if a:0 > 0 && a:1 != ''
-    let t:project_tree_name = a:1
   endif
 
   " see if we should just use a shared tree
@@ -171,6 +170,7 @@ function! eclim#project#tree#ProjectTreeOpen(names, dirs, ...) " {{{
   endtry
 
   setlocal bufhidden=hide
+  exec 'setlocal statusline=' . escape(a:display, ' ')
 
   if expand && expandDir != ''
     call eclim#util#DelayedCommand(
@@ -370,7 +370,7 @@ function! s:OpenFile(action) " {{{
     endif
 
     call eclim#tree#ExecuteAction(path,
-      \ "call eclim#project#tree#OpenProjectFile('" . a:action . "', '<cwd>', '<file>')")
+      \ "call eclim#project#tree#OpenProjectFile('" . a:action . "', '<file>')")
   endif
 endfunction " }}}
 
@@ -396,8 +396,7 @@ endfunction " }}}
 function! eclim#project#tree#ProjectTreeSettings() " {{{
   for action in g:EclimProjectTreeActions
     call eclim#tree#RegisterFileAction(action.pattern, action.name,
-      \ "call eclim#project#tree#OpenProjectFile('" .
-      \   action.action . "', '<cwd>', '<file>')")
+      \ "call eclim#project#tree#OpenProjectFile('" . action.action . "', '<file>')")
   endfor
 
   call eclim#tree#RegisterDirAction(function('eclim#project#tree#InjectLinkedResources'))
@@ -415,21 +414,18 @@ function! eclim#project#tree#ProjectTreeSettings() " {{{
   augroup END
 endfunction " }}}
 
-" OpenProjectFile(cmd, cwd, file) {{{
+" OpenProjectFile(cmd, file) {{{
 " Execute the supplied command in one of the main content windows.
-function! eclim#project#tree#OpenProjectFile(cmd, cwd, file)
-  let cmd = a:cmd
-  let cwd = substitute(getcwd(), '\', '/', 'g')
-  let cwd = escape(cwd, ' &')
-
-  "exec 'cd ' . escape(a:cwd, ' ')
-  exec g:EclimProjectTreeContentWincmd
-
-  let file = cwd . '/' . a:file
-
-  if eclim#util#GoToBufferWindow(file)
+function! eclim#project#tree#OpenProjectFile(cmd, file)
+  if eclim#util#GoToBufferWindow(a:file)
     return
   endif
+
+  let file = a:file
+  let cmd = a:cmd
+  let cwd = getcwd()
+
+  exec g:EclimProjectTreeContentWincmd
 
   " if the buffer is a no name and action is split, use edit instead.
   if cmd =~ 'split' && expand('%') == '' &&
@@ -437,10 +433,20 @@ function! eclim#project#tree#OpenProjectFile(cmd, cwd, file)
     let cmd = 'edit'
   endif
 
+  " current file doesn't share same cwd as the project tree
+  let lcwd = getcwd()
+  if lcwd != cwd && !filereadable(file)
+    let file = escape(substitute(cwd, '\', '/', 'g'), ' &') . '/' . file
+  endif
+
   try
     exec cmd . ' ' file
   catch /E325/
-    " ignore attention error since the use should be prompted to handle it.
+    " ignore attention error since the user should be prompted to handle it.
+  finally
+    if lcwd != cwd
+      exec 'lcd ' . escape(cwd, ' ')
+    endif
   endtry
 endfunction " }}}
 
