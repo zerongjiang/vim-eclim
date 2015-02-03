@@ -1,12 +1,11 @@
 " Author:  Eric Van Dewoestine
 "
 " Description: {{{
-"   Default xml.vim only defines the xmlRegion if xml folding is enabled, but
-"   xmlRegion is needed to allow spell check highlighting of xml text.
+"   see http://eclim.org/vim/scala/search.html
 "
 " License:
 "
-" Copyright (C) 2005 - 2013  Eric Van Dewoestine
+" Copyright (C) 2012  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -23,21 +22,20 @@
 "
 " }}}
 
-source $VIMRUNTIME/syntax/xml.vim
+" Global Varables {{{
+  if !exists("g:EclimScalaSearchSingleResult")
+    " possible values ('split', 'edit', 'lopen')
+    let g:EclimScalaSearchSingleResult = g:EclimDefaultFileOpenAction
+  endif
+" }}}
 
-" the c# syntax file loads syntax/xml.vim, but the below changes may break
-" syntax highlighting in c#
-if &ft == 'cs'
-  finish
-endif
+" Script Varables {{{
+  let s:search = '-command scala_search'
+" }}}
 
-if !exists('g:xml_syntax_folding')
-  " taken from syntax/xml.vim, but removed unecessary portions.
-  syn region   xmlRegion
-    \ start=+<\z([^ /!?<>"']\+\)+
-    \ skip=+<!--\_.\{-}-->+
-    \ end=+</\z1\_\s\{-}>+
-    \ contains=xmlTag,xmlEndTag,xmlCdata,xmlRegion,xmlComment,xmlEntity,xmlProcessing,@xmlRegionHook,@Spell
-endif
+function! eclim#scala#search#Search(argline) " {{{
+  return eclim#lang#Search(
+    \ s:search, g:EclimScalaSearchSingleResult, a:argline)
+endfunction " }}}
 
 " vim:ft=vim:fdm=marker

@@ -1,12 +1,11 @@
 " Author:  Eric Van Dewoestine
 "
 " Description: {{{
-"   Default xml.vim only defines the xmlRegion if xml folding is enabled, but
-"   xmlRegion is needed to allow spell check highlighting of xml text.
+"   see http://eclim.org/vim/scala/index.html
 "
 " License:
 "
-" Copyright (C) 2005 - 2013  Eric Van Dewoestine
+" Copyright (C) 2011 - 2013  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -23,21 +22,38 @@
 "
 " }}}
 
-source $VIMRUNTIME/syntax/xml.vim
+" Global Variables {{{
 
-" the c# syntax file loads syntax/xml.vim, but the below changes may break
-" syntax highlighting in c#
-if &ft == 'cs'
-  finish
+if !exists("g:EclimScalaValidate")
+  let g:EclimScalaValidate = 1
 endif
 
-if !exists('g:xml_syntax_folding')
-  " taken from syntax/xml.vim, but removed unecessary portions.
-  syn region   xmlRegion
-    \ start=+<\z([^ /!?<>"']\+\)+
-    \ skip=+<!--\_.\{-}-->+
-    \ end=+</\z1\_\s\{-}>+
-    \ contains=xmlTag,xmlEndTag,xmlCdata,xmlRegion,xmlComment,xmlEntity,xmlProcessing,@xmlRegionHook,@Spell
+" }}}
+
+" Options {{{
+
+exec 'setlocal ' . g:EclimCompletionMethod . '=eclim#scala#complete#CodeComplete'
+
+" }}}
+
+" Autocmds {{{
+
+augroup eclim_scala
+  autocmd! BufWritePost <buffer>
+  autocmd BufWritePost <buffer> call eclim#lang#UpdateSrcFile('scala')
+augroup END
+
+" }}}
+
+" Command Declarations {{{
+
+command! -nargs=0 -buffer Validate :call eclim#lang#UpdateSrcFile('scala', 1)
+
+if !exists(":ScalaSearch")
+  command -buffer -nargs=0
+    \ ScalaSearch :call eclim#scala#search#Search('<args>')
 endif
+
+" }}}
 
 " vim:ft=vim:fdm=marker
