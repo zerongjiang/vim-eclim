@@ -1,12 +1,6 @@
 " Author:  Eric Van Dewoestine
 "
-" Description: {{{
-"   Utility functions.
-"
-"   This plugin contains shared functions that can be used regardless of the
-"   current file type being edited.
-"
-" License:
+" License: {{{
 "
 " Copyright (C) 2005 - 2012  Eric Van Dewoestine
 "
@@ -656,17 +650,6 @@ function! eclim#util#MakeWithCompiler(compiler, bang, args, ...)
     set shellpipe=>\ %s\ 2<&1
   endif
 
-  if a:compiler =~ 'ant\|maven\|mvn'
-    runtime autoload/eclim/java/test.vim
-    if exists('*eclim#java#test#ResolveQuickfixResults')
-      augroup eclim_make_java_test
-        autocmd!
-        autocmd QuickFixCmdPost make
-          \ call eclim#java#test#ResolveQuickfixResults(['junit', 'testng'])
-      augroup END
-    endif
-  endif
-
   try
     unlet! g:current_compiler b:current_compiler
     exec 'compiler ' . a:compiler
@@ -718,8 +701,6 @@ function! eclim#util#MakeWithCompiler(compiler, bang, args, ...)
       exec 'lcd ' . escape(w:quickfix_dir, ' ')
       unlet w:quickfix_dir
     endif
-
-    silent! autocmd! eclim_make_java_test
   endtry
 endfunction " }}}
 
@@ -1000,10 +981,14 @@ function! eclim#util#PromptList(prompt, list, ...)
   try
     " clear any previous messages
     redraw
-    " echoing the list prompt vs. using it in the input() avoids apparent vim
-    " bug that causes "Internal error: get_tv_string_buf()".
-    echo prompt . "\n"
-    let response = input(a:prompt . ": ")
+    try
+      let response = input(prompt . "\n" . a:prompt . ": ")
+    catch
+      " echoing the list prompt vs. using it in the input() avoids apparent vim
+      " bug that causes "Internal error: get_tv_string_buf()".
+      echo prompt . "\n"
+      let response = input(a:prompt . ": ")
+    endtry
     while response !~ '\(^$\|^[0-9]\+$\)' ||
         \ response < 0 ||
         \ response > (len(a:list) - 1)
@@ -1012,6 +997,7 @@ function! eclim#util#PromptList(prompt, list, ...)
     endwhile
   finally
     echohl None
+    redraw!
   endtry
 
   if response == ''
@@ -1051,16 +1037,40 @@ function! eclim#util#PromptConfirm(prompt, ...)
   return response =~ '\c\s*\(y\(es\)\?\)\s*'
 endfunction " }}}
 
-" ReloadRetab() {{{
-" Reload the current file using ':edit' and retab.
-" Takes care of preserving &expandtab before executing the edit to keep indent
-" detection plugins from always setting it to 0 if eclipse inserts some tabbed
-" code that the indent detection plugin uses for its calculations.
-function! eclim#util#ReloadRetab()
+" Reload() {{{
+" Reload the current file using ':edit' and perform other operations based on
+" the options supplied.
+" Supported Options:
+"   retab: Issue a retab of the file taking care of preserving &expandtab
+"     before executing the edit to keep indent detection plugins from always
+"     setting it to 0 if eclipse inserts some tabbed code that the indent
+"     detection plugin uses for its calculations.
+"   pos: A line/column pair indicating the new cursor position post edit. When
+"     this pair is supplied, this function will attempt to preserve the
+"     current window's viewport.
+function! eclim#util#Reload(options)
+  let winview = winsaveview()
   let save_expandtab = &expandtab
+
   edit!
-  let &expandtab = save_expandtab
-  retab
+
+  if has_key(a:options, 'pos') && len(a:options.pos) == 2
+    let lnum = a:options.pos[0]
+    let cnum = a:options.pos[1]
+    if winheight(0) < line('$')
+      let winview.topline += lnum - winview.lnum
+      let winview.lnum = lnum
+      let winview.col = cnum
+      call winrestview(winview)
+    else
+      call cursor(lnum, cnum)
+    endif
+  endif
+
+  if has_key(a:options, 'retab') && a:options.retab
+    let &expandtab = save_expandtab
+    retab
+  endif
 endfunction " }}}
 
 " SetLocationList(list, [action]) {{{
@@ -1093,6 +1103,14 @@ function! eclim#util#SetLocationList(list, ...)
   else
     call setloclist(0, loclist, a:1)
   endif
+
+  let projectName = eclim#project#util#GetCurrentProjectName()
+  if projectName != ''
+    for item in getloclist(0)
+      call setbufvar(item.bufnr, 'eclim_project', projectName)
+    endfor
+  endif
+
   if g:EclimShowCurrentError && len(loclist) > 0
     call eclim#util#DelayedCommand('call eclim#util#ShowCurrentError()')
   endif
@@ -1174,6 +1192,8 @@ function! eclim#util#ShowCurrentError()
   if message != ''
     " remove any new lines
     let message = substitute(message, '\n', ' ', 'g')
+    " convert tabs to spaces to ensure a consistent char to display length
+    let message = substitute(message, '\t', '  ', 'g')
 
     call eclim#util#WideMessage('echo', message)
     let s:show_current_error_displaying = 1
@@ -1259,11 +1279,12 @@ function! eclim#util#System(cmd, ...)
         let outfile = g:EclimTempDir . '/eclim_exec_output.txt'
         if has('win32') || has('win64') || has('win32unix')
           let cmd = substitute(cmd, '^!', '', '')
-          let cmd = substitute(cmd, '^"\(.*\)"$', '\1', '')
-          if executable('tee')
+          if (executable('tee') || executable('wtee')) && !has('win32unix')
+            let tee = executable('wtee') ? 'wtee' : 'tee'
             let teefile = has('win32unix') ? eclim#cygwin#CygwinPath(outfile) : outfile
-            let cmd = '!cmd /c "' . cmd . ' 2>&1 | tee "' . teefile . '" "'
+            let cmd = '!cmd /c "' . cmd . ' 2>&1 | ' . tee . ' "' . teefile . '" "'
           else
+            let outfile = has('win32unix') ? eclim#cygwin#WindowsPath(outfile) : outfile
             let cmd = '!cmd /c "' . cmd . ' >"' . outfile . '" 2>&1 "'
           endif
         else
@@ -1337,14 +1358,18 @@ function! eclim#util#TempWindow(name, lines, ...)
   let filename = expand('%:p')
   let winnr = winnr()
 
-  let name = eclim#util#EscapeBufferName(a:name)
+  let bufname = eclim#util#EscapeBufferName(a:name)
+  let name = escape(a:name, ' ')
+  if has('unix')
+    let name = escape(name, '[]')
+  endif
 
   let line = 1
   let col = 1
 
-  if bufwinnr(name) == -1
+  if bufwinnr(bufname) == -1
     let height = get(options, 'height', 10)
-    silent! noautocmd exec "botright " . height . "sview " . escape(a:name, ' []')
+    silent! noautocmd exec "botright " . height . "sview " . name
     setlocal nowrap
     setlocal winfixheight
     setlocal noswapfile
@@ -1353,7 +1378,7 @@ function! eclim#util#TempWindow(name, lines, ...)
     setlocal bufhidden=delete
     silent doautocmd WinEnter
   else
-    let temp_winnr = bufwinnr(name)
+    let temp_winnr = bufwinnr(bufname)
     if temp_winnr != winnr()
       exec temp_winnr . 'winc w'
       silent doautocmd WinEnter

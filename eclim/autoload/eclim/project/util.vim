@@ -184,7 +184,7 @@ function! eclim#project#util#ProjectImport(arg)
 
   let naturesDict = {}
   for [key, value] in items(eclim#project#util#GetNatureAliasesDict())
-    let naturesDict[value] = key
+    let naturesDict[value[-1]] = key
   endfor
 
   let natureIds = []
@@ -886,6 +886,10 @@ endfunction " }}}
 " GetProjectRelativeFilePath([file]) {{{
 " Gets the project relative path for the current or supplied file.
 function! eclim#project#util#GetProjectRelativeFilePath(...)
+  if exists('b:eclim_file')
+    return b:eclim_file
+  endif
+
   let file = a:0 == 0 ? expand('%:p') : a:1
   let project = eclim#project#util#GetProject(file)
   if !len(project)
@@ -901,7 +905,7 @@ function! eclim#project#util#GetProjectRelativeFilePath(...)
 
   " handle file in linked folder
   if result == file
-    for name in keys(project.links)
+    for name in keys(get(project, 'links', {}))
       if file =~ '^' . project.links[name] . pattern
         let result = substitute(file, project.links[name], name, '')
       endif
@@ -933,10 +937,13 @@ function! eclim#project#util#GetProjects()
         let project['workspace'] = workspace
         if has('win32unix')
           let project['path'] = eclim#cygwin#CygwinPath(project['path'])
-          call map(project['links'], 'eclim#cygwin#CygwinPath(v:val)')
+          if has_key(project, 'links')
+            call map(project['links'], 'eclim#cygwin#CygwinPath(v:val)')
+          endif
         endif
       endfor
       let s:workspace_projects[workspace] = results
+      unlet results
     endfor
   endif
 
@@ -949,7 +956,10 @@ endfunction " }}}
 
 " GetProject(path) {{{
 function! eclim#project#util#GetProject(path)
-  let path = substitute(fnamemodify(a:path, ':p'), '\', '/', 'g')
+  " if a [No Name] buffer, use the current working directory.
+  let path = a:path != '' ? a:path : getcwd()
+
+  let path = substitute(fnamemodify(path, ':p'), '\', '/', 'g')
   let pattern = '\(/\|$\)'
   if has('win32') || has('win64')
     let pattern .= '\c'
@@ -972,6 +982,16 @@ function! eclim#project#util#GetProject(path)
       endif
     endfor
   endfor
+
+  " project not found by path, fallback to buffer local variable
+  if exists('b:eclim_project')
+    for project in projects
+      if project.name == b:eclim_project
+        return project
+      endif
+    endfor
+  endif
+
   return {}
 endfunction " }}}
 
