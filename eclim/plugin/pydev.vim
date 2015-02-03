@@ -2,7 +2,7 @@
 "
 " License: {{{
 "
-" Copyright (C) 2011 - 2014  Eric Van Dewoestine
+" Copyright (C) 2012 - 2014  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -19,39 +19,23 @@
 "
 " }}}
 
-" Global Variables {{{
-
-if !exists("g:EclimScalaValidate")
-  let g:EclimScalaValidate = 1
-endif
-
-" }}}
-
-" Options {{{
-
-exec 'setlocal ' . g:EclimCompletionMethod . '=eclim#scala#complete#CodeComplete'
-
-" }}}
-
-" Autocmds {{{
-
-augroup eclim_scala
-  autocmd! BufWritePost <buffer>
-  autocmd BufWritePost <buffer> call eclim#lang#UpdateSrcFile('scala')
-augroup END
-
-" }}}
-
 " Command Declarations {{{
 
-command! -nargs=0 -buffer Validate :call eclim#lang#UpdateSrcFile('scala', 1)
-
-if !exists(":ScalaSearch")
-  command -buffer -nargs=0 ScalaSearch :call eclim#scala#search#Search('<args>')
-endif
-
-if !exists(":ScalaImport")
-  command -buffer -nargs=0 ScalaImport :call eclim#scala#import#Import()
+if !exists(":PythonInterpreter")
+  command! -nargs=?
+    \ -complete=customlist,eclim#python#project#CommandCompletePathOrInterpreterName
+    \ PythonInterpreter
+    \ :call eclim#python#project#ProjectInterpreter('<args>')
+  command! -nargs=0 PythonInterpreterList
+    \ :call eclim#python#project#InterpreterList()
+  command! -nargs=*
+    \ -complete=customlist,eclim#python#project#CommandCompleteInterpreterAdd
+    \ PythonInterpreterAdd
+    \ :call eclim#python#project#InterpreterAdd('<args>')
+  command! -nargs=1
+    \ -complete=customlist,eclim#python#project#CommandCompleteInterpreterPath
+    \ PythonInterpreterRemove
+    \ :call eclim#python#project#InterpreterRemove('<args>')
 endif
 
 " }}}
