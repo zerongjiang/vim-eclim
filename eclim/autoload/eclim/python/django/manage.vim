@@ -19,12 +19,6 @@
 "
 " }}}
 
-" Global Variables {{{
-if !exists('g:EclimDjangoAdmin')
-  let g:EclimDjangoAdmin = 'django-admin.py'
-endif
-" }}}
-
 " Script Variables {{{
 let s:manage_commands = []
 let s:app_commands = [
@@ -54,6 +48,7 @@ let s:sql_dialects = {
     \ 'mysql': 'mysql.vim',
     \ 'postgresql': 'plsql.vim',
     \ 'sqlite3': 'sql.vim',
+    \ 'oracle': 'sqloracle.vim',
   \ }
 
 " }}}
@@ -116,7 +111,7 @@ function! eclim#python#django#manage#Manage(args) " {{{
     else
       let path = eclim#python#django#util#GetProjectPath()
       let engine = eclim#python#django#util#GetSqlEngine(path)
-      let dialect = has_key(s:sql_dialects, engine) ? s:sql_dialects[engine] : 'plsql'
+      let dialect = has_key(s:sql_dialects, engine) ? s:sql_dialects[engine] : 'plsql.vim'
 
       let filename = expand('%')
       let name = '__' . action . '__'

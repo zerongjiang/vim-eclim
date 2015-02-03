@@ -1,9 +1,6 @@
 " Author:  Eric Van Dewoestine
 "
-" Description: {{{
-"   see http://eclim.org/vim/ruby/index.html
-"
-" License:
+" License: {{{
 "
 " Copyright (C) 2005 - 2014  Eric Van Dewoestine
 "
@@ -20,18 +17,6 @@
 " You should have received a copy of the GNU General Public License
 " along with this program.  If not, see <http://www.gnu.org/licenses/>.
 "
-" }}}
-
-" Global Variables {{{
-
-if !exists("g:EclimRubyValidate")
-  let g:EclimRubyValidate = 1
-endif
-
-if !exists("g:EclimRubySyntasticEnabled")
-  let g:EclimRubySyntasticEnabled = 0
-endif
-
 " }}}
 
 " Options {{{
@@ -57,12 +42,14 @@ command! -nargs=0 -buffer Validate :call eclim#lang#UpdateSrcFile('ruby', 1)
 
 if !exists(":RubySearch")
   command -buffer -nargs=*
-    \ -complete=customlist,eclim#ruby#search#CommandCompleteRubySearch
+    \ -complete=customlist,eclim#ruby#search#CommandCompleteSearch
     \ RubySearch :call eclim#ruby#search#Search('<args>')
 endif
 
 if !exists(":RubySearchContext")
-  command -buffer RubySearchContext :call eclim#ruby#search#SearchContext()
+  command -buffer -nargs=*
+    \ -complete=customlist,eclim#ruby#search#CommandCompleteSearchContext
+    \ RubySearchContext :call eclim#ruby#search#SearchContext('<args>')
 endif
 
 " }}}

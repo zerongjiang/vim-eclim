@@ -2,7 +2,7 @@
 "
 " License: {{{
 "
-" Copyright (C) 2005 - 2014  Eric Van Dewoestine
+" Copyright (C) 2014  Eric Van Dewoestine
 "
 " This program is free software: you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -19,25 +19,26 @@
 "
 " }}}
 
+" Options {{{
+
+exec 'setlocal ' . g:EclimCompletionMethod . '=eclim#groovy#complete#CodeComplete'
+
+" }}}
+
 " Autocmds {{{
 
-if g:EclimXsdValidate
-  augroup eclim_xsd_validate
-    autocmd! BufWritePost <buffer>
-    autocmd BufWritePost <buffer> call eclim#lang#Validate('xsd', 1)
-  augroup END
-endif
-
-" disable plain xml validation.
-augroup eclim_xml
+augroup eclim_groovy
   autocmd! BufWritePost <buffer>
+  autocmd BufWritePost <buffer> call eclim#lang#UpdateSrcFile('groovy')
 augroup END
 
 " }}}
 
 " Command Declarations {{{
 
-command! -nargs=0 -buffer Validate :call eclim#lang#Validate('xsd', 0)
+if !exists(":Validate")
+  command! -nargs=0 -buffer Validate :call eclim#lang#UpdateSrcFile('groovy', 1)
+endif
 
 " }}}
 
